@@ -386,6 +386,11 @@ end
 --- treating it as complete (map_editor.tl, "Propose Default Connections"). On a
 --- clustered map it reliably leaves each cluster an island, so we stitch the
 --- components together ourselves before handing the lot to the engine.
+---
+--- Some links will still fail to build: the engine reports "Too Much Incline"
+--- or "Collision" and leaves that pair unconnected. That happens to the stock
+--- generator's own connections too, on hilly maps, so a connected proposal is
+--- the most we can guarantee from here.
 local function connectAll()
 	local entities : {Engine.Entity} = {}
 	local xs : {number} = {}
@@ -465,10 +470,23 @@ local function connectAll()
 		added = added + 1
 	end
 
-	-- keep = false: clear the streets left over from the old layout and lay out
-	-- a fresh network for the towns that are actually there now.
+	-- keep = true: add the links that are missing, leaving the existing street
+	-- network alone.
+	--
+	-- keep = false means "remove the streets first", and that crashed the game:
+	-- an access violation on the Simulation Thread (TransportFever3.exe+0xA4BD7,
+	-- reading a freed pointer) a few seconds after this command was sent. By the
+	-- time we get here the world has been simulating for minutes - towns have
+	-- buildings, industries exist, people are moving - and tearing the whole
+	-- street network out from under that leaves the engine holding stale
+	-- references. The Map Editor can afford keep = false because nothing is
+	-- running there; a game script cannot.
+	--
+	-- The cost is cosmetic: a destroyed town takes its own streets with it (see
+	-- makeTownDestroyCmd), but an inter-town road that used to lead to it can be
+	-- left as a stub.
 	api.cmd.sendCommand(
-		api.cmd.makeTownConnectWithIndustriesCmd(entities, connections, false))
+		api.cmd.makeTownConnectWithIndustriesCmd(entities, connections, true))
 	log.message(LOG .. string.format(
 		"connected %d towns with %d links (%d added to join %s)",
 		count, #connections, added,

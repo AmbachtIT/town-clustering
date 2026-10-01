@@ -231,3 +231,53 @@ every `build_tree.py`.
   and `--script`, not yet explored.
 - No Lua or Teal toolchain is installed, so `tlconfig.lua` is for an editor;
   the game compiles `.tl` at load time and reports failures to the log.
+
+## Rebuilding town roads from a game script (learned the hard way)
+
+`api.cmd.makeTownConnectWithIndustriesCmd(entities, connections, keep)` takes a
+`keep` flag. `keep = false` means *remove the existing streets first*, then lay
+out a fresh network.
+
+Do not pass `false` from a game script in a running game. It crashed TF3
+build 40408 with an access violation on the **Simulation Thread**
+(`TransportFever3.exe+0xA4BD7`, read of a freed pointer) about three seconds
+after the command was sent, with the minidump recorded while the engine was
+still printing `Init streets add proposal error` lines for that same command.
+
+The Map Editor uses `keep = false` safely because nothing is simulating there.
+By the time a game script's first tick has created towns and waited for them to
+appear, the world has buildings, industries and people in it, and removing every
+street leaves the engine holding stale references.
+
+`keep = true` adds the missing links instead and is the only safe option here.
+The cost is cosmetic: `makeTownDestroyCmd` takes a town's own streets with it,
+but an inter-town road that led to a destroyed town can survive as a stub.
+
+Two more things worth knowing about that command:
+
+- `api.engine.mapgen.getDefaultTownConnections` is a **proposal**, not a
+  complete network. The Map Editor merges it into the connections it already has
+  ("Propose Default Connections", `gui/map_editor/map_editor.tl`). On a
+  clustered map it leaves each cluster as its own island.
+- Even a fully connected proposal is not a fully connected map. The engine
+  refuses individual links with `Too Much Incline` or `Collision` and logs
+  `Towns 'A' and 'B'  NOT connected`. The stock generator hits this too.
+
+## Creating towns from a game script
+
+`gui/map_editor/map_editor.tl` (`makeTowns`) is the worked example:
+
+```
+api.engine.terrain.makeMapFromGame(false, true, false, false)  -- current towns
+api.engine.mapgen.createTowns(seed, desired)                   -- {toRemove, toAdd}
+api.cmd.makeTownDestroyCmd / api.cmd.makeTownCreateCmd
+```
+
+A `GameMap.Town` carrying its `existing` entity is left alone; one without it is
+built fresh. Any town in the world the list no longer names comes back in
+`toRemove`. `makeMapFromGame` fills in names, `sizeFactors` and
+`landUse2CargoNeeds`, so a relocated town can inherit its own identity instead of
+having those fields invented.
+
+Creation is asynchronous and not fast: 18 towns took about two and a half
+minutes of game ticks to appear on a medium map.
