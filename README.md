@@ -16,13 +16,22 @@ first tick of the new game:
 
 1. Pick cluster centres by farthest-point sampling, so they spread across the
    map without needing to know the map size.
-2. Leave the towns nearest a centre exactly where they are.
-3. Rebuild each remaining town next to a cluster, on a spot checked for water,
+2. Give each cluster a size: weights from a geometric series, so one
+   conurbation dominates, a couple are middling and one is a modest group.
+3. Leave the towns nearest a centre exactly where they are, up to that
+   cluster's share.
+4. Rebuild each remaining town next to a cluster, on a spot checked for water,
    slope and elbow room first.
-4. Leave a few out in the country and scale them down, so they read as outlying
+5. Leave a few out in the country and scale them down, so they read as outlying
    hamlets.
-5. Lay out the inter-town road network again, stitching the clusters together so
+6. Lay out the inter-town road network again, stitching the clusters together so
    every town stays reachable.
+
+Clusters are deliberately **not** the same size - equal clusters read as
+generated. The ratio between them is drawn per map, so the same settings give a
+different shape on a different seed, and which centre gets the big one is
+shuffled. Expect roughly a three- to fourfold spread between the largest and
+smallest.
 
 **The town count never changes** - towns are relocated, not deleted, so your Town
 Density setting still means what it says. Terrain, rivers and industries are

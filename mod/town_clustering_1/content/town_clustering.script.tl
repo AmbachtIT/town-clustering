@@ -60,6 +60,18 @@ local RING_STEP <const> = 240.0
 local MAX_RINGS <const> = 14
 local ANGLES_PER_RING <const> = 12
 
+--- Cluster sizes follow a geometric series with this ratio, drawn per map: at
+--- 0.55 the smallest of four clusters is about a sixth of the largest, at 0.80
+--- about half. Equal-sized clusters look generated, which is the thing the mod
+--- exists to avoid.
+local SIZE_RATIO_MIN <const> = 0.55
+local SIZE_RATIO_MAX <const> = 0.80
+
+--- No cluster drops below this share of the largest one's weight. Without a
+--- floor, eight clusters at the low end of the ratio range leaves the last few
+--- holding a single town each, which reads as a stray rather than as a group.
+local SIZE_MIN_WEIGHT <const> = 0.18
+
 --- A candidate is rejected if the ground rises or falls more than this across
 --- a probe of SLOPE_PROBE metres either side of it. Towns need buildable
 --- ground, and the generator's own placer applies a similar test.
@@ -77,6 +89,8 @@ local record Candidate
 	y : number
 	--- distance to the nearest chosen cluster centre
 	dist : number
+	--- index of that nearest centre
+	centre : integer
 	--- which of the three fates this town met
 	kind : string
 end
@@ -102,6 +116,40 @@ end
 local function nextRandom(rng : Rng) : number
 	rng.seed = (rng.seed * 1103515245 + 12345) % 2147483648
 	return rng.seed / 2147483648
+end
+
+--- Split `amount` between buckets in proportion to `weights`, by largest
+--- remainder, so the parts add up to exactly `amount` rather than to whatever
+--- rounding each one individually happens to give.
+local function share(amount : integer, weights : {number}) : {integer}
+	local parts : {integer} = {}
+	local remainder : {number} = {}
+	local total = 0.0
+	for __, weight in ipairs(weights) do total = total + weight end
+
+	local handedOut = 0
+	for i, weight in ipairs(weights) do
+		local exact = 0.0
+		if total > 0 then exact = amount * weight / total end
+		parts[i] = math.floor(exact)
+		remainder[i] = exact - parts[i]
+		handedOut = handedOut + parts[i]
+	end
+
+	while handedOut < amount do
+		local best, bestRemainder = 0, -1.0
+		for i = 1, #weights do
+			if remainder[i] > bestRemainder then
+				bestRemainder = remainder[i]
+				best = i
+			end
+		end
+		if best == 0 then break end
+		parts[best] = parts[best] + 1
+		remainder[best] = -1.0
+		handedOut = handedOut + 1
+	end
+	return parts
 end
 
 local function pick(list : {number}, index : integer, fallback : number) : number
@@ -235,7 +283,8 @@ local function redistribute() : integer
 	local towns : {Candidate} = {}
 	for __, source in ipairs(map.towns) do
 		towns[#towns + 1] = {
-			source = source, x = source.pos.x, y = source.pos.y, dist = 0, kind = "move",
+			source = source, x = source.pos.x, y = source.pos.y,
+			dist = 0, centre = 1, kind = "move",
 		}
 	end
 	local total = #towns
@@ -257,11 +306,16 @@ local function redistribute() : integer
 	local centres = chooseCentres(towns, clusterCount, rng)
 	for __, town in ipairs(towns) do
 		local nearest = math.huge
-		for __, centre in ipairs(centres) do
+		local nearestIndex = 1
+		for i, centre in ipairs(centres) do
 			local d = distance2(town.x, town.y, centre.x, centre.y)
-			if d < nearest then nearest = d end
+			if d < nearest then
+				nearest = d
+				nearestIndex = i
+			end
 		end
 		town.dist = nearest
+		town.centre = nearestIndex
 	end
 
 	-- Nearest to a centre keep the position the generator gave them; they are
@@ -272,9 +326,50 @@ local function redistribute() : integer
 
 	local movers = total - stayCount
 	local isolatedCount = math.floor(movers * isolatedShare + 0.5)
-	for i, town in ipairs(towns) do
-		if i <= stayCount then
+
+	-- How big should each cluster be?
+	--
+	-- Sharing the towns out evenly makes the clusters come out the same size,
+	-- which reads as generated. Each centre instead gets a weight from a
+	-- geometric series - one conurbation dominates, a couple are middling, one
+	-- is a modest group - and every later share follows those weights.
+	--
+	-- The ratio varies per map, and which centre draws which weight is shuffled,
+	-- so the big one is not always whichever centre the sampling happened to
+	-- pick first.
+	local ratio = SIZE_RATIO_MIN + nextRandom(rng) * (SIZE_RATIO_MAX - SIZE_RATIO_MIN)
+	local weights : {number} = {}
+	local w = 1.0
+	for i = 1, #centres do
+		if w < SIZE_MIN_WEIGHT then
+			weights[i] = SIZE_MIN_WEIGHT
+		else
+			weights[i] = w
+		end
+		w = w * ratio
+	end
+	for i = #centres, 2, -1 do
+		local j = 1 + math.floor(nextRandom(rng) * i)
+		weights[i], weights[j] = weights[j], weights[i]
+	end
+
+	-- Towns that keep their position have to follow the weights too. Capping
+	-- only the movers leaves the clusters barely more than a fifth apart,
+	-- because the towns that stay are spread evenly by geography and dilute
+	-- everything the weights do.
+	local stayQuota = share(stayCount, weights)
+
+	local stays : {integer} = {}
+	for i = 1, #centres do stays[i] = 0 end
+	local staysTotal = 0
+	for __, town in ipairs(towns) do
+		-- towns are in ascending distance order, so a cluster fills its places
+		-- with the towns already closest to it
+		local k = town.centre
+		if stays[k] < stayQuota[k] then
 			town.kind = "stay"
+			stays[k] = stays[k] + 1
+			staysTotal = staysTotal + 1
 		else
 			town.kind = "move"
 		end
@@ -287,7 +382,7 @@ local function redistribute() : integer
 	local isolated : {Candidate} = {}
 	for i = 1, isolatedCount do
 		local index = total - (i - 1) * 2
-		if index > stayCount and towns[index] ~= nil and towns[index].kind == "move" then
+		if towns[index] ~= nil and towns[index].kind == "move" then
 			towns[index].kind = "isolated"
 			isolated[#isolated + 1] = towns[index]
 		end
@@ -301,32 +396,66 @@ local function redistribute() : integer
 		end
 	end
 
-	-- Hand each mover to the centre that currently has the fewest, so the
-	-- clusters grow at roughly the same rate instead of the first one taking
-	-- everything within reach.
-	local load : {integer} = {}
-	for i = 1, #centres do load[i] = 0 end
+	local moverCount = 0
+	for __, town in ipairs(towns) do
+		if town.kind == "move" then
+			moverCount = moverCount + 1
+		end
+	end
+
+	local quota = share(moverCount, weights)
+
+	-- A cluster with nothing in it is just a gap. Borrow from the largest.
+	for i = 1, #centres do
+		if stays[i] + quota[i] == 0 then
+			local big = 1
+			for k = 2, #centres do
+				if quota[k] > quota[big] then big = k end
+			end
+			if quota[big] > 1 then
+				quota[big] = quota[big] - 1
+				quota[i] = 1
+			end
+		end
+	end
+
+	local placedIn : {integer} = {}
+	for i = 1, #centres do placedIn[i] = 0 end
 
 	local moved, stranded = 0, 0
 	for __, town in ipairs(towns) do
 		if town.kind == "move" then
-			local target = 1
-			for i = 2, #centres do
-				if load[i] < load[target] then target = i end
+			-- Try the centre with the most of its quota outstanding first, and
+			-- fall through to the others if its neighbourhood turns out to be
+			-- full - better a slightly off-quota cluster than a stranded town.
+			local order : {integer} = {}
+			for i = 1, #centres do order[i] = i end
+			table.sort(order, function(a : integer, b : integer) : boolean
+				return (quota[a] - placedIn[a]) > (quota[b] - placedIn[b])
+			end)
+
+			local settled = false
+			for __, k in ipairs(order) do
+				if quota[k] - placedIn[k] > 0 then
+					local ok, x, y = findSpot(centres[k].x, centres[k].y, placed, rng)
+					if ok then
+						town.x = x
+						town.y = y
+						town.centre = k
+						placedIn[k] = placedIn[k] + 1
+						moved = moved + 1
+						placed[#placed + 1] = { x, y }
+						settled = true
+						break
+					end
+				end
 			end
-			local ok, x, y = findSpot(centres[target].x, centres[target].y, placed, rng)
-			if not ok then
-				-- No room left near that centre: leave the town alone rather
-				-- than destroy it. A quieter result than losing a town.
+			if not settled then
+				-- Nowhere to put it: leave the town alone rather than destroy
+				-- it. A quieter result than losing a town.
 				town.kind = "stay"
 				stranded = stranded + 1
 				placed[#placed + 1] = { town.x, town.y }
-			else
-				town.x = x
-				town.y = y
-				load[target] = load[target] + 1
-				moved = moved + 1
-				placed[#placed + 1] = { x, y }
 			end
 		end
 	end
@@ -371,10 +500,16 @@ local function redistribute() : integer
 		end
 	end
 
+	local sizes = ""
+	for i = 1, #centres do
+		if i > 1 then sizes = sizes .. "/" end
+		sizes = sizes .. tostring(stays[i] + placedIn[i])
+	end
+
 	log.message(LOG .. string.format(
-		"%d towns -> %d clusters: %d moved, %d left in place, %d isolated, %d stranded "
-		.. "(%d destroyed, %d created)",
-		total, #centres, moved, stayCount, #isolated, stranded,
+		"%d towns -> %d clusters sized %s (ratio %.2f): %d moved, %d left in place, "
+		.. "%d isolated, %d stranded (%d destroyed, %d created)",
+		total, #centres, sizes, ratio, moved, staysTotal, #isolated, stranded,
 		#result.toRemove, #result.toAdd))
 	return total
 end

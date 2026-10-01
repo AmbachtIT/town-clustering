@@ -13,6 +13,12 @@ on the first tick of the new game: the towns nearest a set of chosen cluster
 centres keep their generated position, the rest are destroyed and re-created
 next to a cluster, and the inter-town road network is rebuilt.
 
+Cluster sizes follow a geometric series with a per-map ratio (`SIZE_RATIO_MIN`
+.. `SIZE_RATIO_MAX`, floored by `SIZE_MIN_WEIGHT`), shuffled across the centres.
+Both the towns that stay and the towns that move are shared out by those
+weights - weighting only the movers leaves the sizes barely a fifth apart,
+because the towns that stay are spread evenly by geography.
+
 The town count is preserved, so the player's Town Density choice still holds.
 The rebuild uses the Map Editor's own town-import calls - `makeMapFromGame`,
 `mapgen.createTowns`, then `makeTownDestroyCmd` / `makeTownCreateCmd`
