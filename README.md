@@ -11,31 +11,33 @@ countryside, which gives inter-city lines somewhere to actually go.
 Towns are placed natively in C++ while the new game dialog is open, and no mod
 code runs in the menu, so there is no hook for *placing* towns differently.
 
-So the mod lets generation finish untouched and prunes afterwards, on the first
-tick of the new game:
+So the mod lets generation finish untouched and rearranges afterwards, on the
+first tick of the new game:
 
 1. Pick cluster centres by farthest-point sampling, so they spread across the
    map without needing to know the map size.
-2. Keep the towns nearest a centre; destroy the rest.
-3. Spare a few of the doomed towns as isolated ones and scale them down, so they
-   read as outlying hamlets.
-4. Rebuild the inter-town road network for the survivors, so no road dead-ends
-   where a town used to be.
+2. Leave the towns nearest a centre exactly where they are.
+3. Rebuild each remaining town next to a cluster, on a spot checked for water,
+   slope and elbow room first.
+4. Leave a few out in the country and scale them down, so they read as outlying
+   hamlets.
+5. Lay out the inter-town road network again, stitching the clusters together so
+   every town stays reachable.
 
-**Towns are never moved.** Pruning keeps terrain, rivers and industries exactly
-as the stock generator made them, and every surviving town sits on a position the
-engine already judged valid.
+**The town count never changes** - towns are relocated, not deleted, so your Town
+Density setting still means what it says. Terrain, rivers and industries are
+left exactly as the stock generator made them.
 
 ## Settings
 
-| Setting        | Values                       | Meaning                                        |
-|----------------|------------------------------|------------------------------------------------|
-| Cluster Count  | 2 / 3 / 4 / 5 / 6 / 8        | How many groups to form                        |
-| Towns Kept     | 30% / 45% / 60% / 75% / 100% | Share of generated towns that survive pruning  |
-| Isolated Towns | None / 5% / 10% / 20%        | Share of survivors left standing alone         |
+| Setting             | Values                       | Meaning                                               |
+|---------------------|------------------------------|-------------------------------------------------------|
+| Cluster Count       | 2 / 3 / 4 / 5 / 6 / 8        | How many groups to form                               |
+| Towns Left In Place | 30% / 45% / 60% / 75% / 100% | Share that keeps its generated position; the rest move |
+| Isolated Towns      | None / 5% / 10% / 20%        | Share of the moved towns left standing alone          |
 
-Because the mod only ever *removes* towns, **raise the game's own Town Density**
-to compensate for the ones that get pruned.
+No need to touch Town Density: the mod moves towns rather than removing them, so
+the count you chose is the count you get.
 
 ## Installing
 
@@ -49,8 +51,8 @@ mod list before starting a new game.
 The mod only needs to be active when the game starts; afterwards it does nothing
 and can safely be removed from the savegame. It changes the world, so it is not a
 cosmetic mod and achievements stay disabled while it is active. Adding it to an
-established save does nothing at all - it refuses to prune once more than ten
-game days have passed, rather than delete towns out from under you.
+established save does nothing at all - it refuses to run once more than ten game
+days have passed, rather than rebuild towns out from under you.
 
 ## Publishing
 
@@ -80,10 +82,10 @@ mod/town_clustering_1/      the publishable mod; deploy.ps1 installs this
   _content.json             content file list
   _metadata/modinfo.json    name, summary, description, authors, tags
   _metadata/0.png           listing image (1920×1080)
-  content/town_pruning.gs.lua      registers the game script
-  content/town_pruning.script.tl   the pruning itself
+  content/town_clustering.gs.lua     registers the game script
+  content/town_clustering.script.tl  the clustering itself
 generators/                 abandoned terrain-generator approach, kept as history
-art/listing-pruned.png      alternative listing image (see below)
+art/listing-pruned.png      listing image for the older pruning behaviour
 tools/build.py              regenerates generators/ from the stock node trees
 tools/check_tree.py         validates a generated node tree before the game sees it
 tools/make_listing_image.ps1  redraws the listing image
@@ -101,13 +103,10 @@ there is no real screenshot in this repository yet. Two variants:
 .\tools\make_listing_image.ps1 -Variant pruned   # towns between clusters struck out
 ```
 
-`arrows` reads as "clustering" instantly but implies the mod *moves* towns, which
-it does not. `pruned` shows what actually happens - towns are removed, survivors
-never move - and is the more honest picture. To swap:
-
-```powershell
-.\tools\make_listing_image.ps1 -Variant pruned
-```
+`arrows` is the accurate one, and is what `0.png` holds: the mod really does move
+towns together, and keeps the count the same. `pruned` depicts the earlier
+behaviour, when towns between the clusters were deleted outright; it is kept
+because it shows more plainly where the empty countryside comes from.
 
 Replace either with a real annotated in-game screenshot when there is one.
 
@@ -117,7 +116,7 @@ The first approach shaped *terrain* instead: a mod-supplied climate generator
 whose node graph roughens everything outside a few broad basins, so flat
 buildable ground - which the engine's town placer needs - survives only inside
 them. It works, and mod generators do appear in the new game dialog, but it buys
-clustering by deforming the whole map. The pruning mod supersedes it. The files
+clustering by deforming the whole map. The script mod supersedes it. The files
 are kept because the node-tree findings in NOTES.md were expensive to get.
 
 ## Development

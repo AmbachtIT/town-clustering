@@ -10,7 +10,7 @@
             "defaultIndex": 3,
             "key": "cluster.count",
             "name": "Cluster Count",
-            "tooltip": "How many separate groups of towns to form.\n\nTowns are generated normally and then pruned down to these groups.",
+            "tooltip": "How many separate groups of towns to form.\n\nTowns are generated normally and then rearranged into these groups.",
             "uiType": "Slider",
             "values": [
                 "2",
@@ -26,8 +26,8 @@
         {
             "defaultIndex": 2,
             "key": "cluster.keep",
-            "name": "Towns Kept",
-            "tooltip": "What share of the generated towns survive pruning.\n\nLower values give tighter, emptier maps. Raise the game's own Town Density to compensate for the towns removed.",
+            "name": "Towns Left In Place",
+            "tooltip": "What share of the generated towns keep the position the map generator gave them.\n\nThe rest are moved next to a cluster. The total number of towns never changes, so there is no need to adjust the game's Town Density.",
             "uiType": "Slider",
             "values": [
                 "30%",
@@ -43,7 +43,7 @@
             "defaultIndex": 3,
             "key": "cluster.isolated",
             "name": "Isolated Towns",
-            "tooltip": "What share of the surviving towns stand alone instead of joining a cluster.\n\nIsolated towns are scaled down, so they read as outlying hamlets.",
+            "tooltip": "What share of the moved towns stay out in the country instead of joining a cluster.\n\nIsolated towns are scaled down, so they read as outlying hamlets.",
             "uiType": "Slider",
             "values": [
                 "None",

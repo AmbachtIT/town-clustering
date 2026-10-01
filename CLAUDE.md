@@ -8,13 +8,18 @@ separated by empty countryside.
 
 Towns are placed natively in C++ while the new game dialog is open, and no mod
 code runs in the menu, so there is no hook for *placing* towns differently. The
-mod therefore lets generation finish untouched and then **prunes** towns on the
-first tick of the new game: the towns nearest a set of chosen cluster centres
-survive, the rest are destroyed, and the inter-town road network is rebuilt for
-whatever is left.
+mod therefore lets generation finish untouched and then **redistributes** towns
+on the first tick of the new game: the towns nearest a set of chosen cluster
+centres keep their generated position, the rest are destroyed and re-created
+next to a cluster, and the inter-town road network is rebuilt.
 
-Towns are never moved. See NOTES.md for the reverse-engineered details and for
-the terrain-based approach in `generators/`, which was abandoned.
+The town count is preserved, so the player's Town Density choice still holds.
+The rebuild uses the Map Editor's own town-import calls - `makeMapFromGame`,
+`mapgen.createTowns`, then `makeTownDestroyCmd` / `makeTownCreateCmd`
+(`gui/map_editor/map_editor.tl`, `makeTowns`).
+
+See NOTES.md for the reverse-engineered details and for the terrain-based
+approach in `generators/`, which was abandoned.
 
 ## Mod parameters
 
@@ -25,17 +30,18 @@ param's `values` list.
 | key                | name           | values                               |
 |--------------------|----------------|--------------------------------------|
 | `cluster.count`    | Cluster Count  | 2 / 3 / 4 / 5 / 6 / 8                |
-| `cluster.keep`     | Towns Kept     | 30% / 45% / 60% / 75% / 100%         |
+| `cluster.keep`     | Towns Left In Place | 30% / 45% / 60% / 75% / 100%    |
 | `cluster.isolated` | Isolated Towns | None / 5% / 10% / 20%                |
 
-`cluster.keep` is the share of generated towns that survive pruning; because the
-mod only removes towns, raise the game's own Town Density to compensate.
-`cluster.isolated` is the share of survivors left standing alone, scaled down so
-they read as outlying hamlets.
+`cluster.keep` is the share of generated towns that keep the position the
+generator gave them; the rest are moved next to a cluster. The total never
+changes, so Town Density needs no adjustment. `cluster.isolated` is the share of
+the moved towns left standing alone out in the country, scaled down so they read
+as outlying hamlets.
 
 There is no "cluster rate" parameter. An earlier draft specified one; it was
 replaced by `cluster.keep` + `cluster.isolated`, which say the same thing in
-terms the pruning implementation can actually honour. A stale `cluster.rate`
+terms the implementation can actually honour. A stale `cluster.rate`
 entry may still sit in the game's `settings.lua` and is ignored.
 
 ## Layout
