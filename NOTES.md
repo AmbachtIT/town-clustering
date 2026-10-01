@@ -253,6 +253,25 @@ street leaves the engine holding stale references.
 The cost is cosmetic: `makeTownDestroyCmd` takes a town's own streets with it,
 but an inter-town road that led to a destroyed town can survive as a stub.
 
+### Connection indices are the engine's, not Lua's
+
+`getDefaultTownConnections` returns "indices into the vector townEntities", and
+that vector is C++ - the indices are **0-based**, while every list on the Lua
+side is 1-based. Appending a 1-based pair to the returned list and sending it
+back crashed the simulation thread twice, in the same engine function
+(`TransportFever3.exe+0xA4BD7` and `+0xA4BE3`), reading out of range - the second
+time from `0xFFFFFFFFFFFFFFFF`, which is what running off the end of that vector
+looks like. Both crashes landed at the very end of the street layout, exactly
+where the appended links sat.
+
+Treating the engine's own indices as 1-based is quietly wrong in the other
+direction: a guard of `index >= 1` drops every connection that touches town 0,
+which invents components that are not really separate.
+
+The mod now derives the base from the data instead of assuming: a zero anywhere
+proves 0-based, a value equal to the town count proves 1-based, and if neither
+appears the sample proves nothing and it sends the engine's proposal unaltered.
+
 Two more things worth knowing about that command:
 
 - `api.engine.mapgen.getDefaultTownConnections` is a **proposal**, not a

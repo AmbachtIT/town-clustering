@@ -419,6 +419,42 @@ local function connectAll()
 
 	local connections = api.engine.mapgen.getDefaultTownConnections(mapTowns)
 
+	-- Which end is index zero?
+	--
+	-- The engine documents these as "indices into the vector townEntities". That
+	-- vector is C++, so they are 0-based, while every list on this side of the
+	-- boundary is 1-based. Appending a 1-based index to the list crashed the
+	-- simulation thread twice on an out-of-range read - the second time reading
+	-- 0xFFFFFFFFFFFFFFFF, which is what running off the end of that vector looks
+	-- like. The crash landed at the very end of the layout, exactly where our own
+	-- appended links sit.
+	--
+	-- Rather than trust either reading, work the base out from the data: a zero
+	-- anywhere proves 0-based, and a value equal to the town count proves
+	-- 1-based, because neither is legal in the other scheme.
+	local lowest, highest = math.huge, -math.huge
+	for __, conn in ipairs(connections) do
+		for k = 1, 2 do
+			local v = conn[k]
+			if v < lowest then lowest = v end
+			if v > highest then highest = v end
+		end
+	end
+
+	local base = -1
+	if #connections == 0 then
+		base = -1
+	elseif lowest <= 0 then
+		base = 0
+	elseif highest >= count then
+		base = 1
+	end
+
+	-- base == -1 means the sample proved nothing: every index landed in the range
+	-- the two schemes share. Guessing would risk either linking the wrong towns
+	-- or crashing the game, so leave the engine's own proposal alone instead.
+	local canAppend = base >= 0
+
 	-- Union-find over the proposed connections.
 	local parent : {integer} = {}
 	for i = 1, count do parent[i] = i end
@@ -440,17 +476,26 @@ local function connectAll()
 		return true
 	end
 
-	for __, conn in ipairs(connections) do
-		-- The engine indexes the town list it was given, 1-based.
-		if conn[1] >= 1 and conn[1] <= count and conn[2] >= 1 and conn[2] <= count then
-			union(conn[1], conn[2])
+	-- Engine index -> our 1-based index. Anything out of range is skipped rather
+	-- than silently folded into the wrong town, which is what the old 1-based
+	-- guard did to every connection that touched index 0.
+	local skipped = 0
+	if canAppend then
+		for __, conn in ipairs(connections) do
+			local a = conn[1] - base + 1
+			local b = conn[2] - base + 1
+			if a >= 1 and a <= count and b >= 1 and b <= count then
+				union(a, b)
+			else
+				skipped = skipped + 1
+			end
 		end
 	end
 
 	-- Join whatever is still separate by the shortest link available, which for
 	-- clustered towns is the pair of towns facing each other across the gap.
 	local added = 0
-	while components > 1 do
+	while canAppend and components > 1 do
 		local bestA, bestB, bestD = 0, 0, math.huge
 		for i = 1, count do
 			for j = i + 1, count do
@@ -466,8 +511,14 @@ local function connectAll()
 		end
 		if bestA == 0 then break end
 		union(bestA, bestB)
-		connections[#connections + 1] = { bestA, bestB }
-		added = added + 1
+		-- Back into the engine's own index base, and never outside the range it
+		-- gave us: a bad index here is an access violation, not an error.
+		local ea = bestA - 1 + base
+		local eb = bestB - 1 + base
+		if ea >= base and ea <= count - 1 + base and eb >= base and eb <= count - 1 + base then
+			connections[#connections + 1] = { ea, eb }
+			added = added + 1
+		end
 	end
 
 	-- keep = true: add the links that are missing, leaving the existing street
@@ -488,9 +539,11 @@ local function connectAll()
 	api.cmd.sendCommand(
 		api.cmd.makeTownConnectWithIndustriesCmd(entities, connections, true))
 	log.message(LOG .. string.format(
-		"connected %d towns with %d links (%d added to join %s)",
-		count, #connections, added,
-		added == 0 and "nothing - already connected" or "separate clusters"))
+		"connected %d towns with %d links: engine proposed %d indexed %d..%d "
+		.. "(read as %d-based), %d skipped, %d added to join separate clusters",
+		count, #connections, #connections - added,
+		lowest == math.huge and 0 or lowest, highest == -math.huge and 0 or highest,
+		base, skipped, added))
 end
 
 local mod = {}
