@@ -26,8 +26,9 @@ The rebuild uses the Map Editor's own town-import calls - `makeMapFromGame`,
 `mapgen.createTowns`, then `makeTownDestroyCmd` / `makeTownCreateCmd`
 (`gui/map_editor/map_editor.tl`, `makeTowns`).
 
-See NOTES.md for the reverse-engineered details and for the terrain-based
-approach in `generators/`, which was abandoned.
+See NOTES.md for the reverse-engineered details, including the terrain-generator
+approach that was tried first and abandoned - its code has been removed, but the
+node-tree findings are kept.
 
 ## Mod parameters
 
@@ -57,9 +58,6 @@ entry may still sit in the game's `settings.lua` and is ignored.
 
 ```
 mod/town_clustering_1/      the publishable mod (deploy.ps1 installs this)
-generators/                 abandoned terrain-generator approach, kept as history
-tools/build.py              regenerates generators/ from the stock node trees
-tools/check_tree.py         validates a generated node tree before the game sees it
 ```
 
 ## Conventions

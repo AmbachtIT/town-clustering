@@ -100,10 +100,7 @@ mod/town_clustering_1/      the publishable mod; deploy.ps1 installs this
   _metadata/0.png           listing image (1920×1080)
   content/town_clustering.gs.lua     registers the game script
   content/town_clustering.script.tl  the clustering itself
-generators/                 abandoned terrain-generator approach, kept as history
 art/listing-pruned.png      listing image for the older pruning behaviour
-tools/build.py              regenerates generators/ from the stock node trees
-tools/check_tree.py         validates a generated node tree before the game sees it
 tools/make_listing_image.ps1  redraws the listing image
 NOTES.md                    reverse-engineered TF3 modding notes
 ```
@@ -126,15 +123,6 @@ because it shows more plainly where the empty countryside comes from.
 
 Replace either with a real annotated in-game screenshot when there is one.
 
-### About `generators/`
-
-The first approach shaped *terrain* instead: a mod-supplied climate generator
-whose node graph roughens everything outside a few broad basins, so flat
-buildable ground - which the engine's town placer needs - survives only inside
-them. It works, and mod generators do appear in the new game dialog, but it buys
-clustering by deforming the whole map. The script mod supersedes it. The files
-are kept because the node-tree findings in NOTES.md were expensive to get.
-
 ## Development
 
 No Lua or Teal toolchain is installed; the game compiles `.tl` at load time and
@@ -143,6 +131,22 @@ type-checking against the game's shipped `tealdef` definitions.
 
 The mod logs with the prefix `[town-clustering]`. If that prefix never appears in
 the log, the game script never ran.
+
+## How this was built
+
+Written with [Claude Code](https://claude.com/claude-code), Anthropic's agentic
+coding tool, in a back-and-forth with the author: the author played the game,
+decided what the mod should do and judged every result; Claude Code did the
+reverse engineering, wrote the Teal and the tooling, and read the crash dumps.
+
+`wiki.transportfever3.com` returns Permission Denied, so nothing here came from
+documentation. Everything in NOTES.md was derived from the game's shipped
+`tealdef` definitions, its own Lua and Teal under `base/` and `mods/release/`,
+and the logs and minidumps in `crash_dump/` - including the two access
+violations that the connection-index bug turned out to be.
+
+The listing image is drawn by a script in `tools/` rather than painted, for the
+same reason: so it can be regenerated and reviewed rather than fiddled with.
 
 ## Licence
 

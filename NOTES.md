@@ -125,7 +125,15 @@ values: they live in `activeModsParamsState`, a react state threaded through the
 fallback is to fork the page recipe, which has both in scope, wrapped in `pcall`
 with `CallOriginalRecipe` so a patch degrades to the stock dialog.
 
-## Terrain generators and node trees (the route that works)
+## Terrain generators and node trees (a road not taken)
+
+This was the first approach: a mod-supplied climate generator whose node graph
+roughens everything outside a few broad basins, so the flat buildable ground the
+town placer needs survives only inside them. It works, and it is the only lever
+the new game dialog exposes - but it buys clustering by deforming the whole map,
+and the game script supersedes it. The code and its two build tools have been
+removed; the findings are kept here because they were expensive to get and
+nothing else documents them.
 
 A terrain generator is a `.gen.lua` declaring `nodeTree` + `params` (the
 sliders). Mod-supplied generators **do** appear in the new game dialog's
@@ -173,8 +181,8 @@ subgraph types do not:
 Using the wrong key fails during generation with
 `Assertion 'it != map.end()' failed` (`map_util.h:22`, `Get`) - the same
 message you get for a missing parameter, with nothing naming the node at
-fault. `tools/check_tree.py` now derives the valid output keys per layerType
-from stock usage and checks them.
+fault. The valid output keys per layerType can be derived from how the stock
+trees use them, which is worth doing before handing a tree to the game.
 
 ### Driving node params from a slider
 
@@ -216,9 +224,10 @@ game down from the new game dialog.
 valid cell-index map is. `fractal_noise_map` needs only `seed`, so basins are
 built from low-frequency noise instead.
 
-`tools/check_tree.py` infers each layerType's required inputs from stock usage
-and validates a generated tree before it ever reaches the game. Run it after
-every `build_tree.py`.
+Each layerType's required inputs can likewise be inferred from stock usage, and
+a generated tree is worth validating against them before the game ever sees it:
+both of these failure modes take the game down from the new game dialog with a
+message that names no node.
 
 ## Environment
 
