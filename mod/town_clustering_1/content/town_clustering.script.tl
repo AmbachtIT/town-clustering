@@ -94,6 +94,14 @@ local MAX_SLOPE_DROP <const> = 14.0
 --- this many ticks and connect whatever is actually there.
 local MAX_SETTLE_TICKS <const> = 240
 
+--- A town is created empty and grows its first houses over the ticks that
+--- follow, so a population of zero means nothing straight away. Wait until the
+--- number of empty towns has stopped falling for this many consecutive checks
+--- before concluding that whatever is left is a dud - usually a centre with no
+--- room to build, hemmed in by a river or a slope.
+local POPULATION_STABLE_TICKS <const> = 90
+local MAX_POPULATION_TICKS <const> = 1200
+
 local record Candidate
 	--- the town as the generator left it
 	source : GameMap.Town
@@ -108,14 +116,22 @@ local record Candidate
 end
 
 local record State
-	--- 0/nil = not started, 1 = towns rebuilt and awaiting the world settling,
-	--- 2 = finished. The road rebuild has to wait: the destroy and create
-	--- commands must land before we ask the engine to lay out a network.
+	--- 0/nil = not started
+	--- 1 = towns rebuilt, waiting for the world to show them all
+	--- 2 = roads laid, waiting to see which towns stay empty
+	--- 3 = empty towns destroyed, one tick before relaying the roads
+	--- 4 = finished
+	--- Each road pass has to wait a tick: the destroy and create commands must
+	--- land before the engine is asked to lay out a network.
 	phase : integer
 	--- how many towns we expect once the rebuild lands
 	expected : integer
-	--- ticks spent waiting in phase 1
+	--- ticks spent waiting in the current phase
 	waited : integer
+	--- how many towns had no inhabitants at the last check
+	zeroes : integer
+	--- consecutive checks in which that count did not fall
+	stable : integer
 	done : boolean
 end
 
@@ -193,6 +209,35 @@ local function countTowns() : integer
 		n = n + 1
 	end, api.type.ComponentType.TOWN)
 	return n
+end
+
+--- A town's population, as the game itself counts it: the residential person
+--- capacity of its buildings (game_mechanics/towns/town_util.tl, which reads
+--- `getTownCapacityUsages(entity).residential.capacity` for the number shown in
+--- the town window).
+local function townPopulation(entity : Engine.Entity) : integer
+	local capacities = api.engine.system.townBuildingSystem.getLandUsePersonCapacities(entity)
+	if capacities == nil then
+		return 0
+	end
+	local residential = capacities[api.type["enum"].LandUseType.RESIDENTIAL as integer + 1]
+	if residential == nil then
+		return 0
+	end
+	return residential
+end
+
+--- Towns with nobody living in them. A town the engine could not build on - the
+--- centre is on land, but the ground around it is river or cliff - is created
+--- happily and then just sits there empty.
+local function emptyTowns() : {Engine.Entity}
+	local empty : {Engine.Entity} = {}
+	api.engine.forEachEntityWithComponent(function(entity : Engine.Entity)
+		if townPopulation(entity) <= 0 then
+			empty[#empty + 1] = entity
+		end
+	end, api.type.ComponentType.TOWN)
+	return empty
 end
 
 local function distance2(ax : number, ay : number, bx : number, by : number) : number
@@ -734,7 +779,8 @@ mod.update = function(_userParams : table, state : GameScriptState<State>, _dt :
 		-- count we expect before laying out roads, but do not wait forever.
 		local waited = (current.waited or 0) + 1
 		if countTowns() < current.expected and waited < MAX_SETTLE_TICKS then
-			state:set({ phase = 1, expected = current.expected, waited = waited, done = false })
+			state:set({ phase = 1, expected = current.expected, waited = waited,
+				zeroes = 0, stable = 0, done = false })
 			return
 		end
 		if countTowns() < current.expected then
@@ -742,7 +788,56 @@ mod.update = function(_userParams : table, state : GameScriptState<State>, _dt :
 				"gave up waiting: %d of %d towns present", countTowns(), current.expected))
 		end
 		connectAll()
-		state:set({ phase = 2, expected = current.expected, waited = waited, done = true })
+		state:set({ phase = 2, expected = current.expected, waited = 0,
+			zeroes = countTowns(), stable = 0, done = false })
+		return
+	end
+
+	if current ~= nil and current.phase == 2 then
+		-- Every town starts empty and fills over the following ticks, so the
+		-- only honest signal is that the number of empty ones has stopped
+		-- falling. Whatever is still empty after that could not build at all.
+		local waited = (current.waited or 0) + 1
+		local empty = emptyTowns()
+		local zeroes = #empty
+
+		local stable = (current.stable or 0) + 1
+		if zeroes < (current.zeroes or 0) then
+			stable = 0
+		end
+
+		if zeroes > 0 and stable < POPULATION_STABLE_TICKS and waited < MAX_POPULATION_TICKS then
+			state:set({ phase = 2, expected = current.expected, waited = waited,
+				zeroes = zeroes, stable = stable, done = false })
+			return
+		end
+
+		if zeroes > 0 then
+			for __, entity in ipairs(empty) do
+				api.cmd.sendCommand(api.cmd.makeTownDestroyCmd(entity))
+			end
+			log.message(LOG .. string.format(
+				"removed %d town(s) with no inhabitants after %d ticks; %d left",
+				zeroes, waited, countTowns() - zeroes))
+			-- Their roads went with them, but the links that led to them can be
+			-- left dangling, so lay the network out once more. Rare enough that
+			-- the extra pass costs nothing in practice.
+			state:set({ phase = 3, expected = current.expected, waited = 0,
+				zeroes = 0, stable = 0, done = false })
+		else
+			log.message(LOG .. string.format(
+				"every town is inhabited after %d ticks", waited))
+			state:set({ phase = 3, expected = current.expected, waited = 0,
+				zeroes = 0, stable = 0, done = true })
+		end
+		return
+	end
+
+	if current ~= nil and current.phase == 3 then
+		-- One tick on, so the destroy commands have landed.
+		connectAll()
+		state:set({ phase = 4, expected = current.expected, waited = 0,
+			zeroes = 0, stable = 0, done = true })
 		return
 	end
 
@@ -752,7 +847,7 @@ mod.update = function(_userParams : table, state : GameScriptState<State>, _dt :
 		-- Not a fresh game: almost certainly the mod was added to an existing
 		-- save. Do nothing, ever, rather than rearrange someone's towns.
 		log.message(LOG .. "not a new game; clustering skipped")
-		state:set({ phase = 2, expected = 0, waited = 0, done = true })
+		state:set({ phase = 4, expected = 0, waited = 0, zeroes = 0, stable = 0, done = true })
 		return
 	end
 
@@ -763,9 +858,10 @@ mod.update = function(_userParams : table, state : GameScriptState<State>, _dt :
 
 	local expected = redistribute()
 	if expected > 0 then
-		state:set({ phase = 1, expected = expected, waited = 0, done = false })
+		state:set({ phase = 1, expected = expected, waited = 0,
+			zeroes = 0, stable = 0, done = false })
 	else
-		state:set({ phase = 2, expected = 0, waited = 0, done = true })
+		state:set({ phase = 4, expected = 0, waited = 0, zeroes = 0, stable = 0, done = true })
 	end
 end
 
