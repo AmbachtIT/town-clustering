@@ -56,6 +56,7 @@ No need to touch Town Density: the mod moves towns rather than removing them, so
 the count you chose is the count you get.
 
 ## Installing
+The easiest way is to subscribe to the mod through [mod.io](https://mod.io/g/transportfever3/m/town-clustering).
 
 ```powershell
 .\deploy.ps1
@@ -65,10 +66,9 @@ Then restart the game - mods are read at startup. Enable *Town Clustering* in th
 mod list before starting a new game.
 
 The mod only needs to be active when the game starts; afterwards it does nothing
-and can safely be removed from the savegame. It changes the world, so it is not a
-cosmetic mod and achievements stay disabled while it is active. Adding it to an
-established save does nothing at all - it refuses to run once more than ten game
-days have passed, rather than rebuild towns out from under you.
+and can safely be removed from the savegame. Adding it to an established save does 
+nothing at all - it refuses to run once more than ten game days have passed, rather 
+than rebuild towns out from under you.
 
 ## Publishing
 
