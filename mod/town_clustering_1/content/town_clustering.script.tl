@@ -38,6 +38,14 @@ local CLUSTER_COUNTS <const> = { 2, 3, 4, 5, 6, 8 }
 local KEEP_FRACTIONS <const> = { 0.30, 0.45, 0.60, 0.75, 1.00 }
 local ISOLATED_SHARES <const> = { 0.0, 0.05, 0.10, 0.20 }
 
+--- Cluster sizes follow a geometric series; these are the bounds the ratio is
+--- drawn from, per slider position. A ratio of 1.0 makes every cluster the same
+--- size; the lower the ratio, the more one conurbation dominates. The range is
+--- a range rather than one number so that the same settings give a different
+--- shape on a different map.
+local VARIATION_RATIO_MIN <const> = { 1.00, 0.78, 0.55, 0.38 }
+local VARIATION_RATIO_MAX <const> = { 1.00, 0.92, 0.80, 0.55 }
+
 --- Isolated towns are scaled to this share of their generated size. They are
 --- meant to read as hamlets left behind by the clustering, not as peers of the
 --- towns in the conurbations.
@@ -59,13 +67,6 @@ local FIRST_RING <const> = 420.0
 local RING_STEP <const> = 240.0
 local MAX_RINGS <const> = 14
 local ANGLES_PER_RING <const> = 12
-
---- Cluster sizes follow a geometric series with this ratio, drawn per map: at
---- 0.55 the smallest of four clusters is about a sixth of the largest, at 0.80
---- about half. Equal-sized clusters look generated, which is the thing the mod
---- exists to avoid.
-local SIZE_RATIO_MIN <const> = 0.55
-local SIZE_RATIO_MAX <const> = 0.80
 
 --- No cluster drops below this share of the largest one's weight. Without a
 --- floor, eight clusters at the low end of the ratio range leaves the last few
@@ -159,16 +160,20 @@ local function pick(list : {number}, index : integer, fallback : number) : numbe
 	return fallback
 end
 
-local function readParams() : integer, number, number
+--- clusterCount, keepFraction, isolatedShare, ratioLow, ratioHigh
+local function readParams() : integer, number, number, number, number
 	local all = api.engine.config.getModParams()
 	local own = all ~= nil and all[MOD_ID] as {string : integer} or nil
 	if own == nil then
 		log.message(LOG .. "no mod params found; using defaults")
-		return 4, 0.45, 0.10
+		return 4, 0.45, 0.10, 0.55, 0.80
 	end
+	local variation = own["cluster.variation"]
 	return math.floor(pick(CLUSTER_COUNTS as {number}, own["cluster.count"], 4)),
 		pick(KEEP_FRACTIONS, own["cluster.keep"], 0.45),
-		pick(ISOLATED_SHARES, own["cluster.isolated"], 0.10)
+		pick(ISOLATED_SHARES, own["cluster.isolated"], 0.10),
+		pick(VARIATION_RATIO_MIN, variation, 0.55),
+		pick(VARIATION_RATIO_MAX, variation, 0.80)
 end
 
 local function countTowns() : integer
@@ -289,7 +294,7 @@ local function redistribute() : integer
 	end
 	local total = #towns
 
-	local clusterCount, keepFraction, isolatedShare = readParams()
+	local clusterCount, keepFraction, isolatedShare, ratioLow, ratioHigh = readParams()
 	local stayCount = math.max(1, math.floor(total * keepFraction + 0.5))
 	if stayCount >= total then
 		log.message(LOG .. "every town stays put; nothing to do")
@@ -337,7 +342,7 @@ local function redistribute() : integer
 	-- The ratio varies per map, and which centre draws which weight is shuffled,
 	-- so the big one is not always whichever centre the sampling happened to
 	-- pick first.
-	local ratio = SIZE_RATIO_MIN + nextRandom(rng) * (SIZE_RATIO_MAX - SIZE_RATIO_MIN)
+	local ratio = ratioLow + nextRandom(rng) * (ratioHigh - ratioLow)
 	local weights : {number} = {}
 	local w = 1.0
 	for i = 1, #centres do

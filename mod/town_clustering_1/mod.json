@@ -24,6 +24,21 @@
             "yearTo": 0
         },
         {
+            "defaultIndex": 3,
+            "key": "cluster.variation",
+            "name": "Cluster Sizes",
+            "tooltip": "How much the clusters differ in size.\n\nEqual gives every cluster the same number of towns. The others let one conurbation dominate, with the rest trailing off - Lopsided most sharply. The exact shape is drawn per map, so the same setting looks different on a different seed.",
+            "uiType": "Slider",
+            "values": [
+                "Equal",
+                "Mild",
+                "Varied",
+                "Lopsided"
+            ],
+            "yearFrom": 0,
+            "yearTo": 0
+        },
+        {
             "defaultIndex": 2,
             "key": "cluster.keep",
             "name": "Towns Left In Place",

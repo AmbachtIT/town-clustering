@@ -27,11 +27,17 @@ first tick of the new game:
 6. Lay out the inter-town road network again, stitching the clusters together so
    every town stays reachable.
 
-Clusters are deliberately **not** the same size - equal clusters read as
-generated. The ratio between them is drawn per map, so the same settings give a
-different shape on a different seed, and which centre gets the big one is
-shuffled. Expect roughly a three- to fourfold spread between the largest and
-smallest.
+**Cluster Sizes** is why the map does not look generated. Equal clusters are a
+giveaway, so by default one conurbation dominates and the rest trail off. The
+exact shape is drawn per map and which centre gets the big one is shuffled, so
+the same setting looks different on a different seed:
+
+| Setting  | Largest vs smallest, 40 towns in 4 clusters |
+|----------|---------------------------------------------|
+| Equal    | 1.2x - the same size bar rounding           |
+| Mild     | 1.2x to 2x                                  |
+| Varied   | 3.5x to 4x (default)                        |
+| Lopsided | 4.5x to 5x - one city region, small satellites |
 
 **The town count never changes** - towns are relocated, not deleted, so your Town
 Density setting still means what it says. Terrain, rivers and industries are
@@ -42,6 +48,7 @@ left exactly as the stock generator made them.
 | Setting             | Values                       | Meaning                                               |
 |---------------------|------------------------------|-------------------------------------------------------|
 | Cluster Count       | 2 / 3 / 4 / 5 / 6 / 8        | How many groups to form                               |
+| Cluster Sizes       | Equal / Mild / Varied / Lopsided | How much the clusters differ in size              |
 | Towns Left In Place | 30% / 45% / 60% / 75% / 100% | Share that keeps its generated position; the rest move |
 | Isolated Towns      | None / 5% / 10% / 20%        | Share of the moved towns left standing alone          |
 

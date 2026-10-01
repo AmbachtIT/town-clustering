@@ -13,8 +13,10 @@ on the first tick of the new game: the towns nearest a set of chosen cluster
 centres keep their generated position, the rest are destroyed and re-created
 next to a cluster, and the inter-town road network is rebuilt.
 
-Cluster sizes follow a geometric series with a per-map ratio (`SIZE_RATIO_MIN`
-.. `SIZE_RATIO_MAX`, floored by `SIZE_MIN_WEIGHT`), shuffled across the centres.
+Cluster sizes follow a geometric series whose ratio is drawn per map from the
+range the `cluster.variation` slider selects (`VARIATION_RATIO_MIN` ..
+`VARIATION_RATIO_MAX`, floored by `SIZE_MIN_WEIGHT`), shuffled across the
+centres.
 Both the towns that stay and the towns that move are shared out by those
 weights - weighting only the movers leaves the sizes barely a fifth apart,
 because the towns that stay are spread evenly by geography.
@@ -36,6 +38,7 @@ param's `values` list.
 | key                | name           | values                               |
 |--------------------|----------------|--------------------------------------|
 | `cluster.count`    | Cluster Count  | 2 / 3 / 4 / 5 / 6 / 8                |
+| `cluster.variation` | Cluster Sizes | Equal / Mild / Varied / Lopsided    |
 | `cluster.keep`     | Towns Left In Place | 30% / 45% / 60% / 75% / 100%    |
 | `cluster.isolated` | Isolated Towns | None / 5% / 10% / 20%                |
 
