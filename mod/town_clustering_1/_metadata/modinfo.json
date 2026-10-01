@@ -5,11 +5,11 @@
             "role": "CREATOR"
         }
     ],
-    "description": "Generates towns normally, then rearranges them into a few dense clusters on the first tick of a new game, leaving empty countryside in between.\n\nThe town count never changes. Towns near a cluster keep the position the map generator gave them; the rest are rebuilt next to a cluster on ground that is checked for water and slope first. Terrain, rivers and industries are untouched, and the roads between towns are laid out again so every town stays reachable.\n\nSettings: Cluster Count, Cluster Sizes, Towns Left In Place, and Isolated Towns. Cluster Sizes decides how lopsided the map is - from clusters of equal size to one dominant conurbation with small satellites. A few towns are left out in the country and scaled down, so they read as outlying hamlets.\n\nThe mod only needs to be active when the game starts. Afterwards it does nothing and can safely be removed from the savegame. It changes the world, so it is not a cosmetic mod and achievements stay disabled while it is active.",
+    "description": "Generates towns normally, then rearranges them into a few dense clusters on the first tick of a new game, leaving empty countryside in between.\n\nThe town count never changes. Towns near a cluster keep the position the map generator gave them; the rest are rebuilt next to a cluster on ground that is checked for water and slope first. Terrain, rivers and industries are untouched, and the roads between towns are laid out again so every town stays reachable.\n\nSettings: Cluster Count, Cluster Sizes, Towns Left In Place, and Isolated Towns. Cluster Sizes decides how lopsided the map is - from clusters of equal size to one dominant conurbation with small satellites. A few towns are left out in the country and scaled down, so they read as outlying hamlets.\n\nThe mod only needs to be active when the game starts. Afterwards it does nothing and can safely be removed from the savegame. Since the number of towns is a setting at game start that does not affect achievements, this mod is classified as cosmetic and will not disable achievements.\r\nAI Diclaimer: Claude Code was used to create this mod.",
     "name": "Town Clustering",
     "summary": "Rearranges generated towns into clusters, leaving empty countryside between them.",
     "tags": [
         "Script Mod"
     ],
-    "url": ""
+    "url": "https://github.com/AmbachtIT/town-clustering"
 }

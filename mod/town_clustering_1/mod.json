@@ -1,6 +1,6 @@
 {
     "autoActivate": false,
-    "cosmetic": false,
+    "cosmetic": true,
     "dependencies": null,
     "incompatibilities": null,
     "modId": "town_clustering_1",
