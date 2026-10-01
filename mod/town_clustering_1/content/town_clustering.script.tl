@@ -61,8 +61,13 @@ local MAX_START_GAME_TIME <const> = 60 * 60 * 24 * 10
 --- MIN_TOWN_SPACING is deliberately far below the generator's own roughly one
 --- town per 5 km2 - about 1400 m between neighbours - because packing towns
 --- tighter than the engine ever would is the entire point. It still has to be
---- wide enough that two town centres do not try to grow through each other.
-local MIN_TOWN_SPACING <const> = 800.0
+--- wide enough that two town centres do not try to grow through each other,
+--- and 600 m is the tightest that has been tried in game.
+---
+--- Note that a cluster centre is itself a town, so it occupies the middle
+--- before any mover is placed: the innermost ring that can actually be used is
+--- the first one wider than this spacing, not FIRST_RING.
+local MIN_TOWN_SPACING <const> = 600.0
 local FIRST_RING <const> = 420.0
 local RING_STEP <const> = 240.0
 local MAX_RINGS <const> = 14
