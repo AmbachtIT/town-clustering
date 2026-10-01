@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# Visual Studio local workspace state
+.vs/
