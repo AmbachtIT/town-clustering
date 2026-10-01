@@ -134,13 +134,11 @@ the log, the game script never ran.
 
 ## How this was built
 
-Written with [Claude Code](https://claude.com/claude-code), Anthropic's agentic
-coding tool, in a back-and-forth with the author: the author played the game,
-decided what the mod should do and judged every result; Claude Code did the
-reverse engineering, wrote the Teal and the tooling, and read the crash dumps.
+Written with [Claude Code](https://claude.com/claude-code), in a back-and-forth with the author: 
+the author played the game, decided what the mod should do and judged every result; Claude Code 
+was used for reverse engineering, wrote the Teal and the tooling, and read the crash dumps.
 
-`wiki.transportfever3.com` returns Permission Denied, so nothing here came from
-documentation. Everything in NOTES.md was derived from the game's shipped
+Everything in NOTES.md was derived from the game's shipped
 `tealdef` definitions, its own Lua and Teal under `base/` and `mods/release/`,
 and the logs and minidumps in `crash_dump/` - including the two access
 violations that the connection-index bug turned out to be.
