@@ -5,7 +5,7 @@ return {
 	include_dir = {
 		"C:/Program Files (x86)/Steam/steamapps/common/Transport Fever 3/api/tealdef",
 		"C:/Program Files (x86)/Steam/steamapps/common/Transport Fever 3/base/tealdef",
-		"mod/town_redistribution_1/content",
+		"mod/town_clustering_1/content",
 	},
 	global_env_def = "all_def"
 }

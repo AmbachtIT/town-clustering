@@ -1,6 +1,57 @@
-# Town Redistribution
-Town redistribution is a mod for Transport Fever 3. In standard map generation, towns are distributed uniformly across the map. This mod will scatter towns in a non-uniform way so there are clusters of towns.
+# Town Clustering
 
-Mod parameters:
-- Cluster count: Number of clusters
-- Cluster rate:  Percentage of towns that are clustered. 0% = uniform distribution
+Town Clustering is a mod for Transport Fever 3. In standard map generation towns
+are distributed uniformly across the map. This mod leaves dense groups of towns
+separated by empty countryside.
+
+## How it works
+
+Towns are placed natively in C++ while the new game dialog is open, and no mod
+code runs in the menu, so there is no hook for *placing* towns differently. The
+mod therefore lets generation finish untouched and then **prunes** towns on the
+first tick of the new game: the towns nearest a set of chosen cluster centres
+survive, the rest are destroyed, and the inter-town road network is rebuilt for
+whatever is left.
+
+Towns are never moved. See NOTES.md for the reverse-engineered details and for
+the terrain-based approach in `generators/`, which was abandoned.
+
+## Mod parameters
+
+Declared in `mod/town_clustering_1/mod.json`; read back in the game script via
+`api.engine.config.getModParams()`, which returns **1-based** indices into each
+param's `values` list.
+
+| key                | name           | values                               |
+|--------------------|----------------|--------------------------------------|
+| `cluster.count`    | Cluster Count  | 2 / 3 / 4 / 5 / 6 / 8                |
+| `cluster.keep`     | Towns Kept     | 30% / 45% / 60% / 75% / 100%         |
+| `cluster.isolated` | Isolated Towns | None / 5% / 10% / 20%                |
+
+`cluster.keep` is the share of generated towns that survive pruning; because the
+mod only removes towns, raise the game's own Town Density to compensate.
+`cluster.isolated` is the share of survivors left standing alone, scaled down so
+they read as outlying hamlets.
+
+There is no "cluster rate" parameter. An earlier draft specified one; it was
+replaced by `cluster.keep` + `cluster.isolated`, which say the same thing in
+terms the pruning implementation can actually honour. A stale `cluster.rate`
+entry may still sit in the game's `settings.lua` and is ignored.
+
+## Layout
+
+```
+mod/town_clustering_1/      the publishable mod (deploy.ps1 installs this)
+generators/                 abandoned terrain-generator approach, kept as history
+tools/build.py              regenerates generators/ from the stock node trees
+tools/check_tree.py         validates a generated node tree before the game sees it
+```
+
+## Conventions
+
+- All files are LF (`.gitattributes` pins this); `core.autocrlf` must not win.
+- `mod.json` param indices are 1-based - confirmed against the stock climate
+  generators in `base/content/climates.zip`, which default to index 3 of
+  `[Sparse, Scattered, Medium, Dense, Packed]`.
+- `.gs.lua` game scripts run in the game state; never `require` anything under
+  `::/gui/...` from them.

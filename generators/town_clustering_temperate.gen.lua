@@ -11,7 +11,7 @@
 --   basins ~7.1km | buildable below -0.30 | 42m of relief
 function data()
 return { 
-		nodeTree = "town_redistribution_temperate.tree",
+		nodeTree = "town_clustering_temperate.tree",
 		climate = "::/climates/temperate/temperate.clima",
 		desc = { 
 			cargoTypeSet = { 

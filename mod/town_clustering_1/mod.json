@@ -1,11 +1,10 @@
 {
+    "autoActivate": false,
+    "cosmetic": false,
     "dependencies": null,
     "incompatibilities": null,
-    "modId": "town_redistribution_1",
+    "modId": "town_clustering_1",
     "options": null,
-    "revision": 1,
-    "severityAdd": "None",
-    "severityRemove": "None",
     "params": [
         {
             "defaultIndex": 3,
@@ -62,7 +61,12 @@
     "postRunScript": {
         "fileName": ""
     },
+    "revision": 1,
     "runScript": {
         "fileName": ""
-    }
+    },
+    "severityAdd": "None",
+    "severityRemove": "None",
+    "url": "",
+    "visible": true
 }

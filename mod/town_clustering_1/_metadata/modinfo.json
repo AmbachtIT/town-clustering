@@ -1,0 +1,15 @@
+{
+    "authors": [
+        {
+            "name": "Bram Fokke",
+            "role": "CREATOR"
+        }
+    ],
+    "description": "Generates towns normally, then prunes them into a few clusters on the first tick of a new game, leaving dense groups of towns separated by empty countryside.\n\nTerrain, rivers and industries are untouched - only towns are removed. Towns are never moved. A few isolated towns are kept and scaled down so they read as outlying hamlets, and the roads between towns are rebuilt for whatever survives.\n\nSettings: Cluster Count, Towns Kept, and Isolated Towns. Because the mod only removes towns, raise the game's own Town Density to compensate.\n\nThe mod only needs to be active when the game starts. Afterwards it does nothing and can safely be removed from the savegame. It changes the world, so it is not a cosmetic mod and achievements stay disabled while it is active.",
+    "name": "Town Clustering",
+    "summary": "Prunes generated towns into clusters, leaving empty countryside between them.",
+    "tags": [
+        "Script Mod"
+    ],
+    "url": ""
+}

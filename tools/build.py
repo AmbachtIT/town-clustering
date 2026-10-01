@@ -1,11 +1,11 @@
-"""Build the Town Redistribution terrain generators from the stock ones.
+"""Build the Town Clustering terrain generators from the stock ones.
 
 For every climate and every strength preset we emit two files:
 
-  town_redistribution_<climate><suffix>.tree.lua
+  town_clustering_<climate><suffix>.tree.lua
       the stock node graph with a basin subgraph spliced into its height chain,
       everything else byte-for-byte identical
-  town_redistribution_<climate><suffix>.gen.lua
+  town_clustering_<climate><suffix>.gen.lua
       the stock generator pointing at our tree
 
 The subgraph roughens the land *outside* a set of broad basins, so flat
@@ -383,7 +383,7 @@ def main(stock_dir, out_dir):
             continue
         presets = PROFILES if climate == TEST_CLIMATE else (DEFAULT_PROFILE,)
         for preset in presets:
-            base = "town_redistribution_%s%s" % (climate, preset["suffix"])
+            base = "town_clustering_%s%s" % (climate, preset["suffix"])
             build_tree(stock_tree, os.path.join(out_dir, base + ".tree.lua"), preset)
             display = build_gen(stock_gen,
                                 os.path.join(out_dir, base + ".gen.lua"),

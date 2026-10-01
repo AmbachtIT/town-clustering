@@ -4,7 +4,7 @@
 function data()
 	return {
 		updateScript = {
-			fileName = "town_redistribution_1::/town_pruning.script@update",
+			fileName = "town_clustering_1::/town_pruning.script@update",
 		},
 	}
 end

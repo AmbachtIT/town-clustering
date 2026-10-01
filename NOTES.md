@@ -80,8 +80,8 @@ So the split is mandatory:
 
 | file | state | referenced from | may require `::/gui/...` |
 |---|---|---|---|
-| `town_redistribution.script.tl` | mod / game-init | `mod.json` hooks | **no** |
-| `town_redistribution_gui.script.tl` | GUI | `react-replacement-config` | yes |
+| `town_clustering.script.tl` | mod / game-init | `mod.json` hooks | **no** |
+| `town_clustering_gui.script.tl` | GUI | `react-replacement-config` | yes |
 
 A broken mod here does not corrupt anything - the game refuses to start the
 game and names the mod - but it does block loading until the mod is fixed or

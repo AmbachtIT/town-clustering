@@ -1,4 +1,4 @@
---- Town Redistribution - prune generated towns into clusters.
+--- Town Clustering - prune generated towns into clusters.
 ---
 --- The engine places towns uniformly during map generation and there is no way
 --- to influence that from the new game dialog (see NOTES.md - no mod code runs
@@ -19,8 +19,8 @@
 
 local entity_util = ug_require "::/scripts/entity_util.tl" as EntityUtil
 
-local LOG <const> = "[town-redistribution] "
-local MOD_ID <const> = "town_redistribution_1"
+local LOG <const> = "[town-clustering] "
+local MOD_ID <const> = "town_clustering_1"
 
 --- Slider index (1-based) to value. Index 0 or missing falls back to DEFAULT.
 local CLUSTER_COUNTS <const> = { 2, 3, 4, 5, 6, 8 }
