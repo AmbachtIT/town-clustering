@@ -315,22 +315,24 @@ $scrim = New-Object System.Drawing.Drawing2D.LinearGradientBrush $scrimRect, (Ne
 $scrim.WrapMode = [System.Drawing.Drawing2D.WrapMode]::TileFlipXY
 $gfx.FillRectangle($scrim, 0, 0, $W, 430)
 
-$titleFont = New-Object System.Drawing.Font "Segoe UI", 76, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
-$subFont = New-Object System.Drawing.Font "Segoe UI", 30, ([System.Drawing.FontStyle]::Regular), ([System.Drawing.GraphicsUnit]::Pixel)
-$tagFont = New-Object System.Drawing.Font "Segoe UI", 22, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
-
+# The title carries the image on its own - no eyebrow, no subtitle - so it is
+# sized to use the room that leaves.
+$titleFont = New-Object System.Drawing.Font "Segoe UI", 132, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
 $inkBrush = New-Object System.Drawing.SolidBrush $Ink
-$softBrush = New-Object System.Drawing.SolidBrush $InkSoft
-$accentBrush = New-Object System.Drawing.SolidBrush $Accent
 
-$gfx.DrawString("TRANSPORT FEVER 3", $tagFont, $accentBrush, 112, 46)
-$gfx.DrawString("TOWN CLUSTERING", $titleFont, $inkBrush, 104, 86)
+$titleText = "TOWN CLUSTERING"
+$titleX = 104.0
+$titleY = 74.0
+$gfx.DrawString($titleText, $titleFont, $inkBrush, $titleX, $titleY)
 
-# Accent rule between title and subtitle, tied to the arrow colour.
-$rulePen = New-Object System.Drawing.Pen $Accent, 6
-$gfx.DrawLine($rulePen, 112, 182, 300, 182)
+# Accent rule under the title, tied to the arrow colour. Measured rather than
+# placed by hand, so it stays put if the title or its size changes.
+$titleSize = $gfx.MeasureString($titleText, $titleFont)
+$rulePen = New-Object System.Drawing.Pen $Accent, 8
+$ruleY = $titleY + $titleSize.Height - 18
+$gfx.DrawLine($rulePen, [float]($titleX + 8), [float]$ruleY, [float]($titleX + 8 + 260), [float]$ruleY)
 
-$gfx.DrawString("Dense groups of towns, empty countryside between them", $subFont, $softBrush, 110, 200)
+Write-Host ("  title {0:N0} x {1:N0} px, ends at x={2:N0}" -f $titleSize.Width, $titleSize.Height, ($titleX + $titleSize.Width))
 
 # ---------------------------------------------------------------- save
 $dir = Split-Path -Parent $OutFile
