@@ -89,16 +89,24 @@ local SIZE_MIN_WEIGHT <const> = 0.18
 --- any probe lands in water. Towns need buildable ground, and the generator's
 --- own placer applies a similar test.
 ---
---- The probe reaches 48 m because 24 m was not far enough: a river or a bank
---- just outside that radius left the centre looking fine while the town had
---- nowhere to build, which is how towns ended up oddly placed and occasionally
---- with no inhabitants at all.
+--- The ground is sampled in PROBE_DIRECTIONS directions at each of two radii,
+--- so the whole disc around a candidate has to be reasonably flat and dry - not
+--- just the point it sits on.
 ---
---- Note that widening the probe without raising MAX_SLOPE_DROP also halves the
---- gradient a candidate may sit on - 14 m over 48 m rather than over 24 m. That
---- is deliberate, but it is the knob to turn if clusters start coming out
---- sparse or the log starts reporting stranded towns.
+--- Both radii matter. 24 m alone missed a river or a bank just beyond it and
+--- left the centre looking fine while the town had nowhere to build; 48 m alone
+--- steps straight over a ditch or a ridge at 24 m. Eight directions rather than
+--- four because at 48 m a feature lying diagonally between the axes slips
+--- through a four-point test entirely.
+---
+--- Note that MAX_SLOPE_DROP applies across every sample, so widening the reach
+--- also tightens the gradient a candidate may sit on - 14 m across 48 m is 29%,
+--- where 14 m across 24 m was 58%. That is the intended direction, but it is
+--- the knob to turn if clusters come out sparse or the log reports stranded
+--- towns.
 local SLOPE_PROBE <const> = 48.0
+local SLOPE_PROBE_INNER <const> = 24.0
+local PROBE_DIRECTIONS <const> = 8
 local MAX_SLOPE_DROP <const> = 14.0
 
 --- Creating towns is asynchronous. Stop waiting for the world to settle after
@@ -294,22 +302,27 @@ local function isBuildable(x : number, y : number) : boolean
 
 	local centre = api.engine.terrain.getHeightAt(pos)
 	local lo, hi = centre, centre
-	local probes = {
-		{ x - SLOPE_PROBE, y }, { x + SLOPE_PROBE, y },
-		{ x, y - SLOPE_PROBE }, { x, y + SLOPE_PROBE },
-	}
-	for __, p in ipairs(probes) do
-		local probe = api.type.Vec2f.new(p[1], p[2])
-		if not api.engine.terrain.isValidCoordinate(probe) then
-			return false
+
+	for __, radius in ipairs({ SLOPE_PROBE_INNER, SLOPE_PROBE }) do
+		for direction = 0, PROBE_DIRECTIONS - 1 do
+			local angle = direction * math.pi * 2 / PROBE_DIRECTIONS
+			local probe = api.type.Vec2f.new(
+				x + math.cos(angle) * radius,
+				y + math.sin(angle) * radius)
+
+			if not api.engine.terrain.isValidCoordinate(probe) then
+				return false
+			end
+			if api.engine.terrain.isOnWater(probe) then
+				return false
+			end
+
+			local h = api.engine.terrain.getHeightAt(probe)
+			if h < lo then lo = h end
+			if h > hi then hi = h end
 		end
-		if api.engine.terrain.isOnWater(probe) then
-			return false
-		end
-		local h = api.engine.terrain.getHeightAt(probe)
-		if h < lo then lo = h end
-		if h > hi then hi = h end
 	end
+
 	return (hi - lo) <= MAX_SLOPE_DROP
 end
 
