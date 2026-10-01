@@ -84,10 +84,21 @@ local JITTER_SHARE <const> = 0.18
 --- holding a single town each, which reads as a stray rather than as a group.
 local SIZE_MIN_WEIGHT <const> = 0.18
 
---- A candidate is rejected if the ground rises or falls more than this across
---- a probe of SLOPE_PROBE metres either side of it. Towns need buildable
---- ground, and the generator's own placer applies a similar test.
-local SLOPE_PROBE <const> = 24.0
+--- A candidate is rejected if the ground rises or falls more than
+--- MAX_SLOPE_DROP across a probe of SLOPE_PROBE metres either side of it, or if
+--- any probe lands in water. Towns need buildable ground, and the generator's
+--- own placer applies a similar test.
+---
+--- The probe reaches 48 m because 24 m was not far enough: a river or a bank
+--- just outside that radius left the centre looking fine while the town had
+--- nowhere to build, which is how towns ended up oddly placed and occasionally
+--- with no inhabitants at all.
+---
+--- Note that widening the probe without raising MAX_SLOPE_DROP also halves the
+--- gradient a candidate may sit on - 14 m over 48 m rather than over 24 m. That
+--- is deliberate, but it is the knob to turn if clusters start coming out
+--- sparse or the log starts reporting stranded towns.
+local SLOPE_PROBE <const> = 48.0
 local MAX_SLOPE_DROP <const> = 14.0
 
 --- Creating towns is asynchronous. Stop waiting for the world to settle after
