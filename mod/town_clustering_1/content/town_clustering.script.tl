@@ -59,14 +59,20 @@ local MAX_START_GAME_TIME <const> = 60 * 60 * 24 * 10
 --- Placement rules for a relocated town, all in metres.
 ---
 --- MIN_TOWN_SPACING is deliberately far below the generator's own roughly one
---- town per 5 km2: packing towns tighter than the engine ever would is the
---- entire point. It still has to be wide enough that two town centres do not
---- try to grow through each other.
+--- town per 5 km2 - about 1400 m between neighbours - because packing towns
+--- tighter than the engine ever would is the entire point. It still has to be
+--- wide enough that two town centres do not try to grow through each other.
 local MIN_TOWN_SPACING <const> = 800.0
 local FIRST_RING <const> = 420.0
 local RING_STEP <const> = 240.0
 local MAX_RINGS <const> = 14
 local ANGLES_PER_RING <const> = 12
+
+--- How far a town may wander off its ring, as a share of that ring's radius.
+--- Because it scales with the radius, the middle of a cluster stays tight while
+--- the outskirts scatter - which is the shape real town groups have, and the
+--- shape a fixed spacing cannot produce.
+local JITTER_SHARE <const> = 0.18
 
 --- No cluster drops below this share of the largest one's weight. Without a
 --- floor, eight clusters at the low end of the ratio range leaves the last few
@@ -253,13 +259,31 @@ end
 --- losing it. The flag is a separate return rather than a nil position, so the
 --- signature stays honest to Teal - the game type-checks this file at load.
 local function findSpot(cx : number, cy : number, placed : {{number, number}}, rng : Rng) : boolean, number, number
+	local step = math.pi * 2 / ANGLES_PER_RING
+
 	for ring = 1, MAX_RINGS do
 		local radius = FIRST_RING + (ring - 1) * RING_STEP
 		local phase = nextRandom(rng) * math.pi * 2
+		local wobble = radius * JITTER_SHARE
+
+		-- Gather every spot on this ring that would work, then take one of them
+		-- at random.
+		--
+		-- Taking the first that fits - which is what this used to do - walks the
+		-- slots in order and stops, so every town lands at the smallest radius
+		-- that will have it and the cluster packs into an even lattice sitting
+		-- 3% above MIN_TOWN_SPACING. Measured, the median gap between
+		-- neighbours was 822 m against a floor of 800. That reads as machined.
+		--
+		-- The candidates are wobbled off the ring before they are tested, not
+		-- after, so the spacing floor still holds exactly.
+		local spotsX : {number} = {}
+		local spotsY : {number} = {}
 		for slot = 0, ANGLES_PER_RING - 1 do
-			local angle = phase + slot * math.pi * 2 / ANGLES_PER_RING
-			local x = cx + math.cos(angle) * radius
-			local y = cy + math.sin(angle) * radius
+			local angle = phase + slot * step + (nextRandom(rng) - 0.5) * step * 0.8
+			local reach = radius + (nextRandom(rng) - 0.5) * 2 * wobble
+			local x = cx + math.cos(angle) * reach
+			local y = cy + math.sin(angle) * reach
 
 			local clear = true
 			for __, p in ipairs(placed) do
@@ -269,8 +293,14 @@ local function findSpot(cx : number, cy : number, placed : {{number, number}}, r
 				end
 			end
 			if clear and isBuildable(x, y) then
-				return true, x, y
+				spotsX[#spotsX + 1] = x
+				spotsY[#spotsY + 1] = y
 			end
+		end
+
+		if #spotsX > 0 then
+			local choice = 1 + math.floor(nextRandom(rng) * #spotsX)
+			return true, spotsX[choice], spotsY[choice]
 		end
 	end
 	return false, 0, 0
