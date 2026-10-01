@@ -1,0 +1,68 @@
+{
+    "dependencies": null,
+    "incompatibilities": null,
+    "modId": "town_redistribution_1",
+    "options": null,
+    "revision": 1,
+    "severityAdd": "None",
+    "severityRemove": "None",
+    "params": [
+        {
+            "defaultIndex": 3,
+            "key": "cluster.count",
+            "name": "Cluster Count",
+            "tooltip": "How many separate groups of towns to form.\n\nTowns are generated normally and then pruned down to these groups.",
+            "uiType": "Slider",
+            "values": [
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "8"
+            ],
+            "yearFrom": 0,
+            "yearTo": 0
+        },
+        {
+            "defaultIndex": 2,
+            "key": "cluster.keep",
+            "name": "Towns Kept",
+            "tooltip": "What share of the generated towns survive pruning.\n\nLower values give tighter, emptier maps. Raise the game's own Town Density to compensate for the towns removed.",
+            "uiType": "Slider",
+            "values": [
+                "30%",
+                "45%",
+                "60%",
+                "75%",
+                "100%"
+            ],
+            "yearFrom": 0,
+            "yearTo": 0
+        },
+        {
+            "defaultIndex": 3,
+            "key": "cluster.isolated",
+            "name": "Isolated Towns",
+            "tooltip": "What share of the surviving towns stand alone instead of joining a cluster.\n\nIsolated towns are scaled down, so they read as outlying hamlets.",
+            "uiType": "Slider",
+            "values": [
+                "None",
+                "5%",
+                "10%",
+                "20%"
+            ],
+            "yearFrom": 0,
+            "yearTo": 0
+        }
+    ],
+    "preRunScript": {
+        "fileName": ""
+    },
+    "postRunScript": {
+        "fileName": ""
+    },
+    "runScript": {
+        "fileName": ""
+    }
+}

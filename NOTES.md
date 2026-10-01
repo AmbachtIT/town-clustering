@@ -1,0 +1,233 @@
+# Transport Fever 3 modding notes
+
+Reverse-engineered from the shipped `api/tealdef` definitions and base game
+scripts. `wiki.transportfever3.com` returns Permission Denied, so none of this
+is from documentation — treat it as findings, and re-verify after game patches.
+
+Paths below are relative to the install:
+`C:\Program Files (x86)\Steam\steamapps\common\Transport Fever 3`
+
+## Where town positions come from
+
+A new game's towns are generated **in the menu, in C++**, not in Lua:
+
+1. `gui/menu/new_game_or_map_settings_page.tl` builds an *empty* map with
+   `app.makeEmptyMap(...)` and a `HeighmapGenerationMode` with
+   `generateTowns = true`.
+2. It hands both to the native `builtin.MapPreviewComp`, along with `seed`,
+   `locationsConfig` and the terrain generator params.
+3. The component generates heightmap + towns + industries and returns the
+   finished `GameMap` via `onReady`, which stores it in `mapState`.
+4. `app.startGame2(map, ...)` (line ~628) starts the game from that map.
+
+So the `GameMap` handed to `startGame2` already contains final town positions.
+Rewriting `map.towns` between step 3 and step 4 is the whole mod.
+
+`BaseConfig.Locations.TownParamList` exposes only `townFrequency`,
+`populationDensity`, `maxNumberPerArea` and `allowInRoughTerrain` — density,
+never spatial pattern. There is no native clustering knob.
+
+## Mod layout
+
+Modelled on `mods/release/urbangames_sandbox`:
+
+```
+<modid>/
+  mod.json                  modId, revision, params, pre/post/runScript, severity*
+  _content.json             { "archives": null, "files": [ ... ] }  paths under content/
+  _metadata/modinfo.json    name, description, authors, tags
+  content/...
+```
+
+Resource names drop `content/` and the final `.tl`/`.lua`:
+`content/foo.script.tl` is addressed as `<modid>::/foo.script`.
+
+Script hooks in `mod.json` use `"<modid>::/<file>.script@<fn>"`.
+`preRunFn(captureParams, configDict, allModParams, baseConfig)` is where
+`baseConfig.*` is tweaked — see `base/mod.script.tl:16`.
+
+## GUI extension
+
+`gui/main/bootstrap_game.tl` reads every generic resource of type
+`react-replacement-config` and calls `<filePath>@<doReplaceFn>(api)` exactly
+once, before any recipe runs. The callback gets `api.ReplaceRecipe(original,
+replacement)`.
+
+A generic resource is a `.res.lua` returning `{ type = "...", data = {...} }`.
+
+Replacement works on **builtins** too — `GloballyReplaceRecipeBeforeInitInternal`
+just writes `_react.recipeReplace[recipeId]` (`gui/main/react.lua:445`). Only
+`react.CallOriginalRecipe` refuses builtins (`react.lua:459`). The dispatcher
+reads the replacement table at *call* time (`react.lua:383`), so you can reach
+the original by clearing your own entry around the call. `react.GetRecipeId` is
+exported (`react.lua:742`).
+
+Replacements are keyed by recipe id globally, and a replacement must itself be a
+registered recipe (`react.RegisterRecipe`) or hooks inside it will run in the
+caller's context.
+
+## Lua states: mod hooks vs GUI (learned the hard way)
+
+There is more than one Lua state, and a module must not straddle them.
+
+A module referenced from `mod.json` (`preRunScript` / `postRunScript` /
+`runScript`) is loaded in the **mod / game-init** state, on a `Load Game Pool`
+thread. Requiring `::/gui/main/builtin.lua` there fails: `_react.builtin` is
+empty, `DeclareBuiltinWithUserdata` logs `Missing builtin recipeId for`, and
+game init aborts with `Could not init game` and a "please remove mod" dialog.
+
+So the split is mandatory:
+
+| file | state | referenced from | may require `::/gui/...` |
+|---|---|---|---|
+| `town_redistribution.script.tl` | mod / game-init | `mod.json` hooks | **no** |
+| `town_redistribution_gui.script.tl` | GUI | `react-replacement-config` | yes |
+
+A broken mod here does not corrupt anything - the game refuses to start the
+game and names the mod - but it does block loading until the mod is fixed or
+removed.
+
+## What the menu does and does not load
+
+Confirmed by probing:
+
+- `mod.json` **is** read in the main menu: the mod's `params` render as sliders
+  on the mod settings page, the chosen indices persist to `settings.lua` under
+  `mainMenuState.activeModsParamsState.<modid>`, and enabling the mod raises the
+  "no achievements" warning.
+- Nothing under `content/` was observed to run in the menu - not the
+  `.res.lua`'s `data()`, not a `.gres.lua` shipped at a base content path.
+
+So manifest-level activation is not the same as content being loaded. Still
+open: whether content is genuinely never loaded in the menu, or whether
+resource `data()` results are served from the content cache the log mentions
+("Reading content cache from json for dir ..."). The `preRunFn` probe is there
+to settle it.
+
+## Open questions (Phase 0 spike)
+
+1. **Does `_reactDoReplaceRecipes` run for the menu UI state at all?** The
+   engine hardcodes two GUI entry points — `gui/main/game.lua` and
+   `gui/menu/main_menu.tl` — and only the first one loads `bootstrap_game.tl`.
+   If the menu is a separate Lua state, it never gets replacements and this
+   approach cannot work. **This gates everything else.**
+2. Can a replaced builtin be called through to, via the clear/restore trick?
+3. Does handing a `GameMap` back as `initialMap` make the preview draw *our*
+   towns, or is `initialMap` only read at mount? Fallback is `inputMap` with
+   `generateTowns = false` — flip `FEEDBACK_MODE` in the script.
+4. How is `GameMap.heightmap` indexed relative to `numTilesX/numTilesY` and
+   `resolution`, and what is the shape/range of `Town.sizeFactors`?
+
+A `MapPreviewComp`-level wrapper probably **cannot** read the mod's own slider
+values: they live in `activeModsParamsState`, a react state threaded through the
+*page*, and there is no `app`-level accessor in the menu
+(`api.engine.config.getModParams()` is engine-side, in-game only). Agreed
+fallback is to fork the page recipe, which has both in scope, wrapped in `pcall`
+with `CallOriginalRecipe` so a patch degrades to the stock dialog.
+
+## Terrain generators and node trees (the route that works)
+
+A terrain generator is a `.gen.lua` declaring `nodeTree` + `params` (the
+sliders). Mod-supplied generators **do** appear in the new game dialog's
+generator dropdown - confirmed in-game - which makes this the only mod-reachable
+lever on the free game dialog. It is how the "Flatter Maps" mod works.
+
+A node tree (`.tree.lua`, ~139KB for temperate) is a saved node-editor graph:
+a flat list of nodes linked **by name**, which makes splicing easy.
+
+```lua
+{
+    color = { ... },
+    inputs = { in1 = { key = "out", nodeName = "<other node>" }, },
+    layerType = "add_map",
+    name = "<unique>",
+    params = { ... },
+    position = { x, y, },
+}
+```
+
+Temperate has 325 nodes across 45 layerTypes. Outputs are only
+`height_map_output`, `output_biomes` and `assets_output` - **there is no town
+output**, so a generator can only shape terrain and let the placer react.
+
+Sliders enter the graph as `param_number` nodes with `params = { key = "mountains" }`,
+matching a `params` entry in the `.gen.lua`. Node params can also be driven by
+wires: some stock `map_clamp_map` nodes take `from`/`to` as inputs rather than
+params. That is the route to a real "cluster count" slider.
+
+There is an in-game node editor (`menu.mapEditor.nodeEditor.window`, button in
+the Map Editor game bar; `local/autosave.tree.lua.bak` is its scratch file).
+
+### Gotcha: output keys are not always "out"
+
+An input references a producer as `{ key = <output name>, nodeName = <node> }`.
+Most nodes publish their result as `out`, but the `gui/node_editor/*.node`
+subgraph types do not:
+
+| producing layerType | output key |
+|---|---|
+| `gui/node_editor/remap_number.node` | `output` |
+| `gui/node_editor/combine_point.node` | `point` |
+| everything else seen so far | `out` |
+
+Using the wrong key fails during generation with
+`Assertion 'it != map.end()' failed` (`map_util.h:22`, `Get`) - the same
+message you get for a missing parameter, with nothing naming the node at
+fault. `tools/check_tree.py` now derives the valid output keys per layerType
+from stock usage and checks them.
+
+### Driving node params from a slider
+
+A `.gen.lua` slider reaches the graph as a `param_number` node whose `params.key`
+matches the slider key. It outputs a **normalised 0..1**, which the stock trees
+then map onto a useful range with `gui/node_editor/remap_number.node`
+(`params a_x/a_y` = input range, `b_x/b_y` = output range, `clamp`).
+
+Most node params can also be driven by a wire instead of a literal, but only
+where the node actually exposes that input. Useful cases found by scanning all
+four stock trees:
+
+| node | wireable inputs seen |
+|---|---|
+| `ridged_noise_map` | `baseFreq`, `gain`, `lacunarity`, `numOctaves`, `seed` |
+| `map_clamp_map` | `in1`, `from`, `to` (`from`/`to` are **points**) |
+| `distance_map` | `threshold` |
+| `white_noise_map` | `probability` |
+| `mul_number` / `add_number` | `in1`, `in2` |
+
+`constant_number`, `constant_point`, `constant_map` and `param_number` never
+take inputs - they are pure sources. To turn numbers into a point (needed for
+`map_clamp_map.from`/`to`) use `gui/node_editor/combine_point.node`, which takes
+`x` and `y` as numbers.
+
+`normalize_map` (`params range_x/range_y`) is worth using after any noise node
+whose natural output range you do not know, so downstream thresholds are
+meaningful.
+
+### Gotcha: required inputs
+
+A node missing a required input crashes map generation with an unhelpful
+`GraphException: Missing input data`
+(`layer_generator_util.cpp:142`, `DataHolder::StartTask`) - taking the whole
+game down from the new game dialog.
+
+`voronoi_noise_map` looks like the obvious tool for clusters but **requires a
+`cellIndex` input** (all four stock trees wire one) and it is not clear what a
+valid cell-index map is. `fractal_noise_map` needs only `seed`, so basins are
+built from low-frequency noise instead.
+
+`tools/check_tree.py` infers each layerType's required inputs from stock usage
+and validates a generated tree before it ever reaches the game. Run it after
+every `build_tree.py`.
+
+## Environment
+
+- TF3 is Steam appid **3493540**.
+- User mods: `C:\Program Files (x86)\Steam\userdata\<id>\3493540\local\mods\`
+  (`staging_area\` beside it is the other mod source, the one the exe's
+  `--validate StagingArea,<mod>` CLI refers to).
+- Log: `...\3493540\local\crash_dump\stdout.txt`.
+- The exe also exposes `--validate`, `--validate-all`, `--and-cook`, `--exec`
+  and `--script`, not yet explored.
+- No Lua or Teal toolchain is installed, so `tlconfig.lua` is for an editor;
+  the game compiles `.tl` at load time and reports failures to the log.
